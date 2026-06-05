@@ -1,4 +1,4 @@
-Nur Die Saxchen vom Sl Ordner sind meinnn Codce. Der rest Code stammt vom Prof. Modul grundlagen Neuronale Netze
+Nur Die Sacchen vom SL Ordner sind mein Code. Der rest Code stammt vom Prof. Modul grundlagen Neuronale Netze
 
 py -m venv .venv
 .venv/Scripts/Activate
