@@ -1,16 +1,11 @@
-#Implementieren Sie eine Restricted Bolzman Machine als einfachste
-#Form eines Autoencoders. Am Eingang sollen die MNIST Ziffern
-#angelegt werden. Durch Aktivierung der Hidden Schicht und
-#Rückaktivierung sollten die MNIST Ziffern wieder rekonstruiert
-#werden können. Nun reduzieren Sie die Anzahl der Hidden
-#Neuronen auf 100. Können die Ziffern trotzdem so rekonstruiert
-#werden, dass man sie noch erkennen kann?
+# Restricted Boltzmann Machine (RBM) als einfacher Autoencoder
+# Aufgabe: MNIST-Ziffern encodieren & rekonstruieren (nur 100 Hidden-Neuronen)
 
 import numpy as np
 import pygame
 
 # --------------------------------------------------------------------------------------------------
-# Screen Setup
+# Fenster
 # --------------------------------------------------------------------------------------------------
 xmax = 600
 ymax = 200
@@ -21,10 +16,8 @@ screen = pygame.display.set_mode((xmax, ymax))
 # Hilfsfunktionen
 # --------------------------------------------------------------------------------------------------
 def sigmoid(x):
+    # Quetscht beliebige Werte auf [0, 1]
     return 1.0 / (1.0 + np.exp(-x))
-
-def sample(p):
-    return (np.random.rand(*p.shape) < p).astype(float)
 
 # --------------------------------------------------------------------------------------------------
 # RBM KLASSE
@@ -32,45 +25,53 @@ def sample(p):
 class RBM:
     
     def __init__(self, visible=28*28, hidden=100):
+        # visible = 784 Pixel-Neuronen, hidden = 100 komprimierte Features
         self.visible = visible
         self.hidden = hidden
 
+        # Gewichte: kleine Zufallswerte (symmetrie brechen)
         self.W = np.random.normal(0, 0.01, size=(hidden, visible))
+        # Bias: anfangs null
         self.v_bias = np.zeros(visible)
         self.h_bias = np.zeros(hidden)
 
     def hidden_prob(self, v):
+        # Sichtbar → Versteckt: Encoding
         return sigmoid(self.W @ v + self.h_bias)
 
     def visible_prob(self, h):
+        # Versteckt → Sichtbar: Decoding (transponierte Gewichte)
         return sigmoid(self.W.T @ h + self.v_bias)
 
     def contrastive_divergence(self, v0, lr=0.1):
-        # positive phase
-        h0_p = self.hidden_prob(v0)
-        h0 = sample(h0_p)
+        # === Contrastive Divergence (CD-1): der Kern des RBM-Lernens ===
 
-        # reconstruction
-        v1_p = self.visible_prob(h0)
-        v1 = sample(v1_p)
+        # Schritt 1: Positiv-Phase – reales Bild encodieren
+        h0 = sigmoid(self.W @ v0 + self.h_bias)
 
-        # negative phase
-        h1_p = self.hidden_prob(v1)
+        # Schritt 2: Rekonstruktion – aus Hidden zurück ins Bildraum
+        v1 = sigmoid(self.W.T @ h0 + self.v_bias)
 
-        # update weights
-        self.W += lr * (np.outer(h0_p, v0) - np.outer(h1_p, v1))
+        # Schritt 3: Negativ-Phase – Hidden aus Rekonstruktion
+        h1 = sigmoid(self.W @ v1 + self.h_bias)
+
+        # Schritt 4: Gewichte anpassen
+        # Positiv: Original stärken, Negativ: Rekonstruktion schwächen
+        # outer() = äußeres Produkt → liefert Gewichtsmatrix aus zwei Vektoren
+        self.W += lr * (np.outer(h0, v0) - np.outer(h1, v1))
         self.v_bias += lr * (v0 - v1)
-        self.h_bias += lr * (h0_p - h1_p)
+        self.h_bias += lr * (h0 - h1)
 
-        return h0_p, v1_p
+        return h0, v1  # Hidden-Aktivierungen & rekonstruiertes Bild
         
     def train(self, v0, lr=0.1):
         return self.contrastive_divergence(v0, lr)
 
 def main():
+    # MNIST laden: jede Zeile = ein Bild, 784 Pixelwerte (0–255)
     test_data = np.loadtxt("SL/Aufgabe3/mnist.csv", delimiter=",")
     
-    # RBM
+    # RBM anlegen: 784 → 100 → 784
     RBMaschine = RBM()
 
     pattern = 0
@@ -82,36 +83,35 @@ def main():
             if event.type == pygame.QUIT:
                 endlos = False
 
-        # -----------------------------
-        # INPUT + INPUT VISUALISIERUNG
-        # -----------------------------
+        # ------------------------------------------------------------------
+        # INPUT: Bild laden & als Rot-Kanal links anzeigen
+        # ------------------------------------------------------------------
         screen.fill((0, 0, 0))
 
         ii = 0
         in_vec = np.zeros(28*28)
 
-        # MNIST pixels
         for y in range(28):
             for x in range(28):
 
-                val = test_data[pattern, ii] / 255.0
+                val = test_data[pattern, ii] / 255.0  # Normierung auf [0,1]
                 in_vec[ii] = val
                 ii += 1
 
                 pygame.draw.rect(
                     screen,
-                    (int(255 * val), 0, 0),
+                    (int(255 * val), 0, 0),  # rot
                     pygame.Rect(x * 5, y * 5, 5, 5)
                 )
 
-        # -----------------------------
-        # TRAIN / FORWARD PASS
-        # -----------------------------
-        hid_vec, out_vec = RBMaschine.train(in_vec,0.1)
+        # ------------------------------------------------------------------
+        # TRAINING: ein Schritt CD-1 → gibt Hidden & Rekonstruktion zurück
+        # ------------------------------------------------------------------
+        hid_vec, out_vec = RBMaschine.train(in_vec, 0.1)
 
-        # -----------------------------
-        # HIDDEN VISUALISIERUNG (10x10)
-        # -----------------------------
+        # ------------------------------------------------------------------
+        # HIDDEN: 100 Neuronen als 10×10 Gitter in Grün (Mitte)
+        # ------------------------------------------------------------------
         jj = 0
         for y in range(10):
             for x in range(10):
@@ -121,15 +121,14 @@ def main():
 
                 pygame.draw.rect(
                     screen,
-                    (0, int(255 * val), 0),
+                    (0, int(255 * val), 0),  # grün
                     pygame.Rect(200 + x * 10, y * 10, 10, 10)
                 )
 
-        # -----------------------------
-        # OUTPUT VISUALISIERUNG
-        # -----------------------------
+        # ------------------------------------------------------------------
+        # OUTPUT: rekonstruiertes Bild als Blau-Kanal rechts
+        # ------------------------------------------------------------------
         kk = 0
-
         for y in range(28):
             for x in range(28):
 
@@ -138,17 +137,17 @@ def main():
 
                 pygame.draw.rect(
                     screen,
-                    (0, 0, int(255 * val)),
+                    (0, 0, int(255 * val)),  # blau
                     pygame.Rect(400 + x * 5, y * 5, 5, 5)
                 )
 
-        # -----------------------------
-        # LOOP CONTROL
-        # -----------------------------
+        # ------------------------------------------------------------------
+        # Alle 100 Bilder kurze Pause zum Anschauen
+        # ------------------------------------------------------------------
         if pattern % 100 == 0:
             pygame.time.delay(500)
 
-        pattern = (pattern + 1) % len(test_data)
+        pattern = (pattern + 1) % len(test_data)  # nächstes Bild (zyklisch)
         pygame.display.flip()
 
 main()

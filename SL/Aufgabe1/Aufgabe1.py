@@ -4,7 +4,6 @@
 # Perzeptron Lernregel ist.
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
 #                 BIAS,x,y
@@ -31,7 +30,13 @@ def learn():
 
 
 #------------------------------------------------------------------------------------------------------------------
-# Perzeptron-Lernregel: Gewichte werden nur bei Fehlklassifikation angepasst
+# Perzeptron-Lernregel: Gewichte werden nur bei Fehlklassifikation angepasst.
+
+# Bei einem Eingangswert von 0 (oi = 0) hat eine Änderung des Gewichts keinen Einfluss,
+# da der Eingabewert mit dem Lernterm multipliziert wird. Bei einem Eingangswert von 1
+# (oi = 1) wird das Gewicht vergrößert, wenn die Ausgabe kleiner als das Ziel ist
+# (oj < targetj), und verkleinert, wenn die Ausgabe größer als das Ziel ist
+# (oj > targetj).
 
 # Stufe: Perzeptron (harte Entscheidung 0/1)
 def learn_new_stufe():
@@ -86,6 +91,7 @@ for i in range(1000):
     #learn_new_sigmoid()   # lerne einen Schritt # --------------------------------------------------
     learn_new_stufe() # --------------------------------------------------
     #DEBUG Zeile
+    print(f"iteration: {i}") # --------------------------------------------------
     print(f"out: {out}, weight: {weight}")  # --------------------------------------------------
     plt.clf() # Bildschirm löschen
     X, Y, Z = outp() # generiere Plotdaten
